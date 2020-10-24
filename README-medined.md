@@ -144,6 +144,113 @@ ssh -i davidm.xyz.pem centos@10.250.192.72
 ssh -i davidm.xyz.pem centos@10.250.198.215
 ```
 
+## Run kubebench
+
+### Preparation
+
+Run the following commands to learn the IP address of each server.
+
+```
+CONTROLLER_HOST_NAME=$(cat ./inventory/hosts | grep "\[kube-master\]" -A 1 | tail -n 1)
+CONTROLLER_IP=$(cat ./inventory/hosts | grep $CONTROLLER_HOST_NAME | grep ansible_host | cut -d'=' -f2)
+
+WORKER_HOST_NAME=$(cat ./inventory/hosts | grep "\[kube-node\]" -A 1 | tail -n 1)
+WORKER_IP=$(cat ./inventory/hosts | grep $WORKER_HOST_NAME | grep ansible_host | cut -d'=' -f2)
+
+ETCD_HOST_NAME=$(cat ./inventory/hosts | grep "\[etcd\]" -A 1 | tail -n 1)
+ETCD_IP=$(cat ./inventory/hosts | grep $ETCD_HOST_NAME | grep ansible_host | cut -d'=' -f2)
+
+# Use these export commands on the bastion server.
+cat <<EOF
+export CONTROLLER_IP=$CONTROLLER_IP
+export WORKER_IP=$WORKER_IP
+export ETCD_IP=$ETCD_IP
+export PKI_PRIVATE_PEM=$(basename $PKI_PRIVATE_PEM)
+EOF
+```
+
+Now SSH into a bastion server.
+
+Run the export commands displayed previously.
+
+### Run Tests.
+
+* The MASTER tests.
+
+```
+ssh -i $PKI_PRIVATE_PEM centos@$CONTROLLER_IP \
+  sudo docker run \
+    --pid=host \
+    --rm=true \
+    --volume /etc/kubernetes:/etc/kubernetes:ro \
+    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
+    --volume /var/lib/kubelet:/var/lib/kubelet:ro \
+    aquasec/kube-bench:latest \
+    --benchmark cis-1.5 run --targets master \
+    | tee kubebench-master-findings.log
+```
+
+* The ETCD tests.
+
+```
+ssh -i $PKI_PRIVATE_PEM centos@$ETCD_IP \
+  sudo docker run \
+    --pid=host \
+    --rm=true \
+    aquasec/kube-bench:latest \
+    --benchmark cis-1.5 run --targets etcd \
+    | tee kubebench-etcd-findings.log
+```
+
+* The CONTROL PLANE tests.
+
+```
+ssh -i $PKI_PRIVATE_PEM centos@$CONTROLLER_IP \
+  sudo docker run \
+    --pid=host \
+    --rm=true \
+    --volume /etc/kubernetes:/etc/kubernetes:ro \
+    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
+    aquasec/kube-bench:latest \
+    --benchmark cis-1.5 run --targets controlplane \
+    | tee kubebench-controlplane-findings.log
+```
+
+* The WORKER tests.
+
+```
+ssh -i $PKI_PRIVATE_PEM centos@$WORKER_IP \
+  sudo docker run \
+    --pid=host \
+    --rm=true \
+    --volume /etc/kubernetes:/etc/kubernetes:ro \
+    --volume /var/lib/kubelet:/var/lib/kubelet:ro \
+    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
+    aquasec/kube-bench:latest \
+    --benchmark cis-1.5 run --targets node \
+    | tee kubebench-node-findings.log
+```
+
+* The POLICY tests.
+
+```
+ssh -i $PKI_PRIVATE_PEM centos@$CONTROLLER_IP \
+  sudo docker run \
+    --pid=host \
+    --rm=true \
+    --volume /etc/kubernetes:/etc/kubernetes:ro \
+    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
+    aquasec/kube-bench:latest \
+    --benchmark cis-1.5 run --targets policies \
+    | tee kubebench-policies-findings.log
+```
+
+* Now exit from the bastion SSH session and copy the findings to your local computer.
+
+```
+scp -i $PKI_PRIVATE_PEM centos@3.238.68.82:kubebench-*.log .
+```
+
 ## Destroy Cluster
 
 ```

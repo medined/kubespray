@@ -99,3 +99,6 @@ target/
 # virtualenv
 venv/
 ENV/
+
+# Department of Veteran Affairs stuff
+kubebench-*.log

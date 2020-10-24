@@ -1,6 +1,6 @@
 ---
-kubeconfig_localhost: false
-kubectl_localhost: false
+kubeconfig_localhost: true
+kubectl_localhost: true
 artifacts_dir: "{{ inventory_dir }}/artifacts"
 
 kube_config_dir: "/etc/kubernetes"

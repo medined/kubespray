@@ -77,7 +77,7 @@ epel_enabled: false
 
 # DNS configuration.
 # Kubernetes cluster name, also will be used as DNS domain
-cluster_name: cluster.local
+cluster_name: flooper
 # Subdomains of DNS domain to be resolved via /etc/resolv.conf for hostnet pods
 ndots: 2
 # Default resolv.conf options
@@ -302,9 +302,9 @@ cert_management: script
 helm_deployment_type: host
 
 # Make a copy of kubeconfig on the host that runs Ansible in {{ inventory_dir }}/artifacts
-kubeconfig_localhost: false
+kubeconfig_localhost: true
 # Download kubectl onto the host that runs Ansible in {{ bin_dir }}
-kubectl_localhost: false
+kubectl_localhost: true
 
 # Define credentials_dir here so it can be overridden
 credentials_dir: "{{ inventory_dir }}/credentials"

@@ -122,8 +122,12 @@ resource "aws_iam_role_policy" "kube-worker" {
             "ecr:BatchGetImage"
           ],
           "Resource": "*"
-        }
-      ]
+        },
+        {
+          "Effect": "Allow",
+          "Action": "kms:*",
+          "Resource": ["*"]
+        }      ]
 }
 EOF
 }

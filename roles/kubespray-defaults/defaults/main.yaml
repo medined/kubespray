@@ -332,7 +332,7 @@
   persistent_volumes_enabled: true
   cephfs_provisioner_enabled: false
   rbd_provisioner_enabled: false
-  ingress_nginx_enabled: false
+  ingress_nginx_enabled: true
   ingress_ambassador_enabled: false
   ingress_alb_enabled: false
   cert_manager_enabled: true

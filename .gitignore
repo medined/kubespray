@@ -102,3 +102,4 @@ ENV/
 
 # Department of Veteran Affairs stuff
 kubebench-*.log
+kubespray-*.log

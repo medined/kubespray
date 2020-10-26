@@ -485,6 +485,7 @@ kubectl -n text-responder get secret text-responder-tls
 curl -k https://$TEXT_RESPONDER_HOST
 ```
 
+
 ## Destroy Cluster
 
 ```

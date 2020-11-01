@@ -400,7 +400,8 @@
   
   ## List of key=value pairs that describe feature gates for
   ## the k8s cluster.
-  kube_feature_gates: []
+  kube_feature_gates:
+    - RotateKubeletServerCertificate=true
   
   # Local volume provisioner storage classes
   # Levarages Ansibles string to Python datatype casting. Otherwise the dict_key isn't substituted

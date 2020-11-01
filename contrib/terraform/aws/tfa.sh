@@ -22,12 +22,17 @@ if [ ! -f $INVENTORY ]; then
     echo "  This file should be created by the Terraform apply command."
 fi
 
-
 rm -rf \
   $KUBESPRAY_INSTALL_DIR/artifacts \
   $INVENTORY/hosts \
   $KUBESPRAY_INSTALL_DIR/ssh-bastion.conf
 
+pushd $KUBESPRAY_INSTALL_DIR/contrib/terraform/aws > /dev/null
+
 terraform init
 
-terraform apply --var-file=credentials.tfvars --auto-approve
+terraform apply \
+    --var-file=credentials.tfvars \
+    --auto-approve
+
+popd > /dev/null

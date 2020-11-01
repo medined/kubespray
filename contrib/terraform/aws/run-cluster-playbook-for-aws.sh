@@ -57,6 +57,8 @@ sed -i "s^server:.*^server: https://$LB_HOST:6443^" admin.conf
 echo "------------------"
 ./kubectl --kubeconfig=admin.conf get nodes
 
+./kubectl --kubeconfig=admin.conf apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/aws/deploy.yaml
+
 echo "------------------"
 echo "Run the following commands to configure kubectl to use the new cluster"
 echo "  rm $HOME/.kube/config"

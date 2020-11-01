@@ -86,7 +86,7 @@ Run the `tfa.sh` script. This should take about two minutes. If you have run `te
 
 ## Install Kubernetes
 
-Run `run-cluster-playbook-for-aws.sh` script. This will run the ansible playbook and show how to set the kubectl configuration file.
+Run `run-cluster-playbook-for-aws.sh` script. This will run the ansible playbook and the display how to set the kubectl configuration file.
 
 Follow the displayed directions to create a symbolic link from `$HOME/.kube/config` to `admin.conf` if you want to use the new kubectl configuration file. **Take care not to overwrite any exsting file!**
 
@@ -114,23 +114,15 @@ My results of the KubeBench are:
 142 total
 ```
 
-## Setup Ingress Controller
+## Deploy An HTTP Application
 
-In order to create an Network Load Balancer, run the following command.
+This application will ensure that the ingress-nginx and cert-manager components are working.
 
-```
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/static/provider/aws/deploy.yaml
-```
-
-Find the load balancer created by the `apply` command.
+* Find the load balancer used by the Ingress-Nginx controller created by the `apply` command.
 
 ```
 kubectl -n ingress-nginx get service ingress-nginx-controller --output=jsonpath="{.status.loadBalancer.ingress[0].hostname}"; echo
 ```
-
-## Deploy An HTTP Application
-
-This application will ensure that the ingress-nginx and cert-manager components are working.
 
 * Create a subdomain for the application to be deployed. For example, `text-responder.davidm.xyz`. Point the subdomain to the network load balancer of the ingress-nginx service.
 

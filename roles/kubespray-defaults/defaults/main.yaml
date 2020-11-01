@@ -215,7 +215,7 @@
   kube_api_aggregator_routing: false
   
   # Profiling
-  kube_profiling: true
+  kube_profiling: false
   
   # Container for runtime
   container_manager: docker

@@ -5,20 +5,25 @@
 ## Prelimary Work You Must Do!
 
 * Read https://medined.github.io/kubernetes/kubespray/encryption/ansible/add-aws-encryption-provider-to-kubespray/ to learn about creating an encryption provider image or just use
-`medined/aws-encryption-provider`. Pay special attention to the section about KEY keys.
+`medined/aws-encryption-provider`. Pay special attention to the section about KMS keys.
 
 * Create an EC2 key pair.
 
-* Export the following environment variables. I use `direnv`. Make sure to change the KMS key and PKI private pem file information.
+* Export the following environment variables. I use `direnv`. Make sure to change the values as needed. The PATH is changed so that you have access to helper scripts. Review all scripts before running them.
 
 ```
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_PROFILE="ic1"
 export CLUSTER="flooper"
 export IMAGE_NAME="medined/aws-encryption-provider"
-export KEY_ID="6a2e5bff-fd5b-4fe6-9394-c4facdc98ece"
-export KEY_ARN="arn:aws:kms:us-east-1:506315921615:key/6a2e5bff-fd5b-4fe6-9394-c4facdc98ece"
+export KEY_ID="99999999-fd5b-4fe6-9394-c4facdc99999"
+export KEY_ARN="arn:aws:kms:us-east-1:506315921615:key/99999999-fd5b-4fe6-9394-c4facdc99999"
+export KUBESPRAY_INSTALL_DIR=/data/projects/ic1/kubespray
 export PKI_PRIVATE_PEM=/data/home/medined/Downloads/pem/davidm.xyz.pem
+
+export PATH=$KUBESPRAY_INSTALL_DIR:$PATH
+export PATH=$KUBESPRAY_INSTALL_DIR/inventory/artifacts:$PATH
+export PATH=$KUBESPRAY_INSTALL_DIR/contrib/terraform/aws:$PATH
 ```
 
 * After cloning this repository, make sure to activate your Python virtual environment. I use `direnv` for this as well.
@@ -77,77 +82,17 @@ AWS_DEFAULT_REGION = "us-east-1"
 
 ## Create AWS Infrastructure
 
-This should take about two minutes. If you have run `terraform apply` before, the generated files will not be overwritten. Therefore, they need to be deleted. That is why the `rm` command is here.
-
-```
-cd contrib/terraform/aws
-#
-# Sanity Check. See the files you will be deleting.
-#
-find ../../../inventory/artifacts ../../../inventory/hosts ../../../ssh-bastion.conf -type f
-
-rm -rf ../../../inventory/artifacts ../../../inventory/hosts ../../../ssh-bastion.conf
-
-#
-# Sanity Check. Make sure the files are gone.
-#
-find ../../../inventory/artifacts ../../../inventory/hosts ../../../ssh-bastion.conf -type f
-
-terraform init
-terraform apply --var-file=credentials.tfvars --auto-approve
-```
+Run the `tfa.sh` script. This should take about two minutes. If you have run `terraform apply` before, the generated files will not be overwritten. Therefore, they need to be deleted. That is why the `rm` command is in the script.
 
 ## Install Kubernetes
 
-Run this from the project's root directory.
+Run `run-cluster-playbook-for-aws.sh` script. This will run the ansible playbook and show how to set the kubectl configuration file.
 
-```
-cd ../../..
-
-time ansible-playbook \
-  -i ./inventory/hosts \
-  ./cluster.yml \
-  -e ansible_user=centos \
-  -e cloud_provider=aws \
-  -e bootstrap_os=centos \
-  --become \
-  --become-user=root \
-  --flush-cache \
-  -e ansible_ssh_private_key_file=$PKI_PRIVATE_PEM \
-  | tee kubespray-cluster-$(date "+%Y-%m-%d_%H:%M").log
-```
-
-## Setup kubectl
-
-By default, the admin.conf file uses the private address of the controller node instead of the load balancer's hostname. The command below fixes this.
-
-Run these commands from the project's root directory.
-
-```
-CONTROLLER_HOST_NAME=$(cat ./inventory/hosts | grep "\[kube-master\]" -A 1 | tail -n 1)
-CONTROLLER_IP=$(cat ./inventory/hosts | grep $CONTROLLER_HOST_NAME | grep ansible_host | cut -d'=' -f2)
-LB_HOST=$(cat inventory/hosts | grep apiserver_loadbalancer_domain_name | cut -d'"' -f2)
-
-cd inventory/artifacts
-cp admin.conf admin.conf.original
-sed -i "s^server:.*^server: https://$LB_HOST:6443^" admin.conf
-./kubectl --kubeconfig=admin.conf get nodes
-
-cd ../..
-```
-
-Add `/data/projects/ic1/kubespray/inventory/artifacts` to the beginning of your `PATH` if you want to use that executable.
-
-Copy `admin.conf` to `$HOME/.kube/config` if you want to use the new kubeconf from its default location. Take care not to overwrite any exsting file! However, I use the following command to create a symbolic link so that tools like `octant` will work.
-
-```bash
-rm $HOME/.kube/config
-ln -s /data/projects/ic1/kubespray/inventory/artifacts/admin.conf $HOME/.kube/config
-```
+Follow the displayed directions to create a symbolic link from `$HOME/.kube/config` to `admin.conf` if you want to use the new kubectl configuration file. **Take care not to overwrite any exsting file!**
 
 ## SSH To Servers
 
-Add `contrib/terraform/aws` to your path. Then use these scripts.
+Use these scripts.
 
 * ssh-to-bastion.sh
 * ssh-to-controller.sh
@@ -156,101 +101,17 @@ Add `contrib/terraform/aws` to your path. Then use these scripts.
 
 ## Run kubebench
 
-See https://medined.github.io/kubernetes/kubebench/kubespray/run-kubebench-on-kubespray-cluster/ if you want to run KubeBench on your cluster.
+Use the `run-kubebench.sh` script.
 
 My results of the KubeBench are:
 
 ```
- 59 PASS
+ 61 PASS
  39 WARN
- 24 FAIL
+ 22 FAIL
  20 INFO
 ---------
 142 total
-```
-
-### Preparation
-
-Now SSH into a bastion server.
-
-Run the export commands displayed previously.
-
-### Run Tests.
-
-* The MASTER tests.
-
-```
-ssh -i $PKI_PRIVATE_PEM centos@$CONTROLLER_IP \
-  sudo docker run \
-    --pid=host \
-    --rm=true \
-    --volume /etc/kubernetes:/etc/kubernetes:ro \
-    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
-    --volume /var/lib/kubelet:/var/lib/kubelet:ro \
-    aquasec/kube-bench:latest \
-    --benchmark cis-1.5 run --targets master \
-    | tee kubebench-master-findings.log
-```
-
-* The ETCD tests.
-
-```
-ssh -i $PKI_PRIVATE_PEM centos@$ETCD_IP \
-  sudo docker run \
-    --pid=host \
-    --rm=true \
-    aquasec/kube-bench:latest \
-    --benchmark cis-1.5 run --targets etcd \
-    | tee kubebench-etcd-findings.log
-```
-
-* The CONTROL PLANE tests.
-
-```
-ssh -i $PKI_PRIVATE_PEM centos@$CONTROLLER_IP \
-  sudo docker run \
-    --pid=host \
-    --rm=true \
-    --volume /etc/kubernetes:/etc/kubernetes:ro \
-    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
-    aquasec/kube-bench:latest \
-    --benchmark cis-1.5 run --targets controlplane \
-    | tee kubebench-controlplane-findings.log
-```
-
-* The WORKER tests.
-
-```
-ssh -i $PKI_PRIVATE_PEM centos@$WORKER_IP \
-  sudo docker run \
-    --pid=host \
-    --rm=true \
-    --volume /etc/kubernetes:/etc/kubernetes:ro \
-    --volume /var/lib/kubelet:/var/lib/kubelet:ro \
-    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
-    aquasec/kube-bench:latest \
-    --benchmark cis-1.5 run --targets node \
-    | tee kubebench-node-findings.log
-```
-
-* The POLICY tests.
-
-```
-ssh -i $PKI_PRIVATE_PEM centos@$CONTROLLER_IP \
-  sudo docker run \
-    --pid=host \
-    --rm=true \
-    --volume /etc/kubernetes:/etc/kubernetes:ro \
-    --volume /usr/bin:/usr/local/mount-from-host/bin:ro \
-    aquasec/kube-bench:latest \
-    --benchmark cis-1.5 run --targets policies \
-    | tee kubebench-policies-findings.log
-```
-
-* Now exit from the bastion SSH session and copy the findings to your local computer.
-
-```
-scp -i $PKI_PRIVATE_PEM centos@3.238.68.82:kubebench-*.log .
 ```
 
 ## Setup Ingress Controller
@@ -269,6 +130,8 @@ kubectl -n ingress-nginx get service ingress-nginx-controller --output=jsonpath=
 
 ## Deploy An HTTP Application
 
+This application will ensure that the ingress-nginx and cert-manager components are working.
+
 * Create a subdomain for the application to be deployed. For example, `text-responder.davidm.xyz`. Point the subdomain to the network load balancer of the ingress-nginx service.
 
 * Set an environment variable with the subdomain name.
@@ -277,59 +140,10 @@ kubectl -n ingress-nginx get service ingress-nginx-controller --output=jsonpath=
 export TEXT_RESPONDER_HOST="text-responder.davidm.xyz"
 ```
 
+* Deply the application assets. These include namespace, deployment, and a service.
 
-* Create a namespace.
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-    name: text-responder
-    labels:
-        name: text-responder
-EOF
 ```
-
-* Deploy a small web server that returns a text message.
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: text-responder
-  namespace: text-responder
-spec:
-  selector:
-    matchLabels:
-      app: text-responder
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: text-responder
-    spec:
-      containers:
-      - name: text-responder
-        image: hashicorp/http-echo
-        args:
-        - "-text=silverargint"
-        ports:
-        - containerPort: 5678
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: text-responder
-  namespace: text-responder
-spec:
-  ports:
-  - port: 80
-    targetPort: 5678
-  selector:
-    app: text-responder
-EOF
+kubectl apply -f yaml-text-responder-application.yaml
 ```
 
 * Forward a local port to the text-responder service to verify the service is working. While the following command is running, visit `http://localhost:7000` in your browser. Then using ^C to stop the port forwarding. An HTTPS request will fail.
@@ -338,7 +152,7 @@ EOF
 kubectl -n text-responder port-forward service/text-responder 7000:80
 ```
 
-* Create an Ingress for the service.
+* Create an Ingress for the service. This can't be put into a yaml file because the hostname is variable.
 
 ```bash
 kubectl apply -f - <<EOF

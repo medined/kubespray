@@ -1,0 +1,42 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: text-responder
+  labels:
+    name: text-responder
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: text-responder
+  namespace: text-responder
+spec:
+  selector:
+    matchLabels:
+      app: text-responder
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: text-responder
+    spec:
+      containers:
+      - name: text-responder
+        image: hashicorp/http-echo
+        args:
+        - "-text=silverargint"
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: text-responder
+  namespace: text-responder
+spec:
+  ports:
+  - port: 80
+    targetPort: 5678
+  selector:
+    app: text-responder
